@@ -4,39 +4,72 @@ use strict;
 use vars qw($VERSION);
 use Apache;
 use Apache::Cookie;
-use Apache::Constants qw(:common);
+use Apache::Constants qw(:common REDIRECT);
 
-$VERSION = '0.01';
+$VERSION = '0.02';
 
 sub handler {
     my $r    = shift;
     my $uri  = $r->uri;
     my $cn   = $r->dir_config('CookieName')     || 'seenMOTD';
     my $exp  = $r->dir_config('ExpireCookie')   || '+1d';
-    my $sec  = $r->dir_config('RedirectInSecs') || 10;
     my $file = $r->dir_config('MessageFile')    || 0;
+    my $cookieless = $r->dir_config('SupportCookieLess') || 1;
+    my $tquery = $r->args; 
 
-    unless ($file) {
-       $r->log_error("Apache::Motd::Error : No MessageFile Specified!");
-       return SERVER_ERROR;
+    ## If the request is the part of the cookie test redirect, then
+    ## take out the ct=1 query_string value and make a note of it
+    ## by setting $ct_request
+    my $ct_request = 0;
+    if ($tquery =~ /ct=1/) { 
+       $ct_request=1;
+       $tquery =~ s/ct=1//; 
+       $r->args($tquery) if ($tquery =~ /=/);
     }
- 
+
+    ## MessageFile appears to be missing, pass onto next phase
+    return OK unless $file;
     return OK unless $r->is_initial_req;
  
-    ## Look for cookie and verify value
+    ## Look for cookie ($cn) and verify it's value
     my $cookies = Apache::Cookie->new($r)->parse;
-    if (my $c   = $cookies->{$cn}) {
-        my $cv  = $c->value;
- 
-        return OK if $cv eq '1';
+    if (my $c = $cookies->{$cn}) {
+       my $cv = $c->value;
+       return OK if ($ct_request == 0  && $cv eq '1');
+       displayMotd($r);
+       return DONE;
     }
- 
-    ## Prepare cookie information
+
+    ## Prepare cookie information and add outgoing headers
     my $cookie = Apache::Cookie->new($r,
                       -name => $cn,-value => '1',-expires => $exp );
- 
     $cookie->bake;
- 
+
+    ## Handle Cookieless clients
+    if ($cookieless) {
+       ## Apparently this client does not like cookies, pass it on to
+       ## next phase
+       return OK if $ct_request;
+
+       my $host   = $r->hostname;
+       my $ct_url = 'http://'.$host.$uri.'?ct=1';
+       ## Test for client for cookie worthiness by redirecting client
+       ## to same $uri but along with the cookie testflag (ct=1) in the
+       ## query_string
+       $r->header_out("Location" => $ct_url);
+       return REDIRECT;
+    }
+
+    displayMotd($r);
+    return DONE;
+}
+
+sub displayMotd {
+    my $r    = shift;
+    my $uri  = $r->uri;
+    my $file = $r->dir_config('MessageFile');
+    my $sec  = $r->dir_config('RedirectInSecs') || 10;
+
     ## Open motd file, otherwise server error
     unless (open MSG,$file) {
        $r->log_error("Apache::Motd::Error : Unable to load: $file");
@@ -57,8 +90,6 @@ sub handler {
  
     $r->send_http_header('text/html');
     $r->print($msg);
- 
-    return DONE;
 }
 
 1;
@@ -75,13 +106,11 @@ Apache::Motd - Provide motd (Message of the Day) functionality to a webserver
 
  <Directive /path/>
    PerlHeaderParserHandler Apache::Motd
-   PerlSetVar MessageFile   /path/to/motd/message **
-   PerlSetVar CookieName     CookieName [seeMOTD]
-   PerlSetVar ExpireCookie   CookieExpirationTime [+1d]
-   PerlSetVar RedirectInSecs N [10]
- </Directive>
-
- **Required Variable, all others are optional
+   PerlSetVar MessageFile   /path/to/motd/message 
+   PerlSetVar CookieName     CookieName [default: seenMOTD]
+   PerlSetVar ExpireCookie   CookieExpirationTime [default: +1d]
+   PerlSetVar RedirectInSecs N [default: 10]
+   PerlSetVar SupportCookieLess (1|0) [default: 1]
 
 =head1 DESCRIPTION
 
@@ -113,28 +142,53 @@ configuration areas.
 
 =over 4
 
-=item MessageFile (required)
+=item B<MessageFile>
 
-The filesystem path to the file that contains the custom message
+The absolute path to the file that contains the custom message. 
+
+ i.e. MessageFile /usr/local/apache/motd.txt
+
+If the file is not found in the specified directory all requests will not be 
+directed to the B<motd>.  Therefore you can rename,delete this file from the 
+specified location to disable the B<motd> without having to edit the 
+httpd.conf entry and/or restart the web server.
 
 See B<MessageFile Format> for a description how the message should
 be used.
 
 
-=item RedirectInSecs (default: 10 seconds)
+
+
+=item B<RedirectInSecs> (default: 10 seconds)
 
 This sets the wait time (in seconds) before the visitor is redirected to the
 initally requested URI
 
 
-=item CookieName (default: seenMOTD)
+=item B<CookieName> (default: seenMOTD)
 
 Set the name of the cookie name 
 
 
-=item ExpireCookie (default: +1d, 1 day)
+=item B<ExpireCookie> (default: +1d, 1 day)
 
 Set the expiration time for the cookie
+
+=item B<SupportCookieLess> (default: 1)
+
+This option is set by default to handle clients that do not support
+cookies or that have cookies turned off. It performs an external
+redirect to the requested C<$uri> along with a C<ct=1> query_string to test
+if the client accepts cookies. If the external redirect successfully sets 
+the cookie, the user is presented with the B<motd>,  otherwise the user is
+not directed to the B<motd> but to the C<$uri>.
+
+Future versions will correctly support non-cookie clients via URL munging.
+
+Setting this option to 0 is ideally used for when you are totally certain
+that all your visitors will accept cookies. This is usually much faster since
+it elminates the external redirect. ***Use with caution. Cookieless clients
+will get the motd message and *only* the motd if this option is set.
 
 =back
 
@@ -155,8 +209,9 @@ Set the expiration time for the cookie
 
 =head1 Message File Format
 
-The text file containing the custom message has access to the following
-tag variables:
+The text file should at least include the folowing tag variables.  These
+tags provide neccessary information to allow redirection to the original
+request and the time (in secs) before the redirection take place.
 
 =over 4
 
@@ -198,6 +253,13 @@ to the initially requested page.
 =head1 BUGS
 
 =over 4
+
+=item Minimal Support for cookie-less clients
+
+Browsers that have their cookies turned off or that do not support them
+will not see the motd. I hope to implement a URL-based solution so that
+Apache::Motd will support these browsers correctly. So in the meantime,
+you must find other ways of relaying your urgent messages to your visitors. 
 
 =item No error checking on the custom message
 

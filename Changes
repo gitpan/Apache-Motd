@@ -3,3 +3,13 @@ Revision history for Perl extension Apache::Motd.
 0.01  Mon Jul 17 14:28:19 2000
 	- original version; created by h2xs 1.18
 
+0.02  Sun Dec 10 05:23:52 2000
+	- Fixed Cookie-less browser problems
+          Browsers with cookies turned off or that do not support
+          them are handled correctly, although still lacking a real
+          working implementation for these scenerios. 
+	- Added module directive, SupportCookieLess
+        - Omitted requirement of MessageFile directive
+	- Documentation changes and corrections
+   
+

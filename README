@@ -5,7 +5,7 @@ DESCRIPTION
 -----------
 
 This is an Apache module designed to be used with the Apache web server
-and the mod_perl environment. It allows web amdinistrators to add motd
+and the mod_perl environment. It allows web administrators to add motd
 (Message of the Day) functionality to a webserver.
 
 
@@ -13,8 +13,8 @@ PRE-REQUISITES
 --------------
 
 	To use this module, you will need:
-	Apache, pref v 1.3.6
-	mod_perl, 1.2
+	Apache, pref v 1.3.x
+	mod_perl, 1.2x
 	Apache::Cookie
 
 INSTALLATION
@@ -39,7 +39,7 @@ AUTHOR
 COPYING
 -------
 
-	       Copyright 1998-1999, C. Ramirez
+	       Copyright 1998-2000, C. Ramirez
 
        This module is free software; you can redistribute it
        and/or modify it under the same terms as Perl itself.     
