@@ -1,4 +1,6 @@
 package Apache::Motd;
+## FILE: Apache/Motd.pm 
+##       $Id: Motd.pm,v 1.2 2002/11/01 00:39:57 ramirezc Exp $
 
 use strict;
 use vars qw($VERSION);
@@ -6,7 +8,7 @@ use Apache;
 use Apache::Cookie;
 use Apache::Constants qw(:common REDIRECT);
 
-$VERSION = '0.04';
+$VERSION = '1.00';
 
 sub handler {
     my $r    = shift;
@@ -52,7 +54,8 @@ sub handler {
     if ($cookieless) {
        ## Apparently this client does not like cookies, pass it on to
        ## next phase
-		 $r->log_error("Motd::Bypassed by ",$r->connection->remote_ip) if $ct_request;
+       $r->log_error("Apache::Motd::Bypassed by ".
+                     $r->connection->remote_ip) if $ct_request;
        return OK if $ct_request;
 
        my $host   = $r->hostname;
@@ -93,14 +96,13 @@ sub displayMotd {
     $msg =~ s/<VAR_REDIRECT>/$sec/g;
 
     ## Maintain a small logging trail
-	 $r->log_error("Motd::Display for URI: $uri from ",
-						$r->connection->remote_ip);
+    $r->log_error("Apache::Motd::Display URI: $uri ".$r->connection->remote_ip);
 
     my $headers = $r->headers_out;
-	    $headers->{'Pragma'} = $headers->{'Cache-control'} = 'no-cache';
+       $headers->{'Pragma'} = $headers->{'Cache-control'} = 'no-cache';
 
     ## straight form the mod_perl guide
-	 $r->no_cache(1);
+    $r->no_cache(1);
     $r->send_http_header('text/html');
     $r->print($msg);
 }
@@ -119,10 +121,10 @@ Apache::Motd - Provide motd (Message of the Day) functionality to a webserver
 
  <Directive /path/>
    PerlHeaderParserHandler Apache::Motd
-   PerlSetVar MessageFile   /path/to/motd/message 
-   PerlSetVar CookieName     CookieName [default: seenMOTD]
-   PerlSetVar ExpireCookie   CookieExpirationTime [default: +1d]
-   PerlSetVar RedirectInSecs N [default: 10]
+   PerlSetVar MessageFile       /path/to/motd/message 
+   PerlSetVar CookieName        CookieName [default: seenMOTD]
+   PerlSetVar ExpireCookie      CookieExpirationTime [default: +1d]
+   PerlSetVar RedirectInSecs    N [default: 10]
    PerlSetVar SupportCookieLess (1|0) [default: 1]
 
 =head1 DESCRIPTION

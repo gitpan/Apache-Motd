@@ -22,4 +22,9 @@ Revision history for Perl extension Apache::Motd.
 	- Fixed port bug
         - Fixed motd file existance check
         - Updated documentation credits
-
+1.00  Thu Oct 31 16:19:33 2002
+        - Imported in CVS
+        - Updated to latest version
+        - Updated README
+        - Updated Makefile.PL to include Apache::Cookie dependency as
+          suggested by CPAN Testers results
