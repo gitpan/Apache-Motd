@@ -11,5 +11,10 @@ Revision history for Perl extension Apache::Motd.
 	- Added module directive, SupportCookieLess
         - Omitted requirement of MessageFile directive
 	- Documentation changes and corrections
-   
+
+0.03  Sun Dec 13 15:30:00 2000
+	- Added no-cache pragma to outgoing headers of motd display
+	- Added bypass motd on sub-directories and location matches example in pod
+	- Added Credits section in pod
+	- Added Notes secion in pod
 

@@ -6,7 +6,7 @@ use Apache;
 use Apache::Cookie;
 use Apache::Constants qw(:common REDIRECT);
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 sub handler {
     my $r    = shift;
@@ -49,6 +49,7 @@ sub handler {
     if ($cookieless) {
        ## Apparently this client does not like cookies, pass it on to
        ## next phase
+		 $r->log_error("Motd::Bypassed by ",$r->connection->remote_ip) if $ct_request;
        return OK if $ct_request;
 
        my $host   = $r->hostname;
@@ -87,7 +88,16 @@ sub displayMotd {
     ## Substitute template variables
     $msg =~ s/<VAR_URI>/$uri/g;
     $msg =~ s/<VAR_REDIRECT>/$sec/g;
- 
+
+    ## Maintain a small logging trail
+	 $r->log_error("Motd::Display for URI: $uri from ",
+						$r->connection->remote_ip);
+
+    my $headers = $r->headers_out;
+	    $headers->{'Pragma'} = $headers->{'Cache-control'} = 'no-cache';
+
+    ## straight form the mod_perl guide
+	 $r->no_cache(1);
     $r->send_http_header('text/html');
     $r->print($msg);
 }
@@ -156,9 +166,6 @@ httpd.conf entry and/or restart the web server.
 See B<MessageFile Format> for a description how the message should
 be used.
 
-
-
-
 =item B<RedirectInSecs> (default: 10 seconds)
 
 This sets the wait time (in seconds) before the visitor is redirected to the
@@ -188,7 +195,7 @@ Future versions will correctly support non-cookie clients via URL munging.
 Setting this option to 0 is ideally used for when you are totally certain
 that all your visitors will accept cookies. This is usually much faster since
 it elminates the external redirect. ***Use with caution. Cookieless clients
-will get the motd message and *only* the motd if this option is set.
+will get the motd message and *only* the motd if this option is false.
 
 =back
 
@@ -249,6 +256,41 @@ a link to allow users to bypass the redirect time (for impatient users and
 as a courtesy). Omitting these will result in the page not redirecting the user
 to the initially requested page.
 
+=head1 NOTES
+
+B<Bypassing Motd>
+
+<Directory> and <Location> configuration settings propogate to sub-directories
+and sub-locations matches. One way to turn off the motd on a motd'd 
+sub-directories and locations is to do the following:
+
+ <Location />
+  PerlHeaderParserHandler Apache::Motd
+ </Location>
+
+ ## Bypass motd on locations under /foo
+ <Location /foo>
+  PerlHeaderParserHandler Apache::Motd:OK
+ </Location>
+
+ **Example courtesy of Jerrad Pierce
+
+B<Logging>
+
+There are two times Apache::Motd logs non-error messages to the apache
+error_logs. One instance is when the motd is displayed and the other
+is when the motd is bypassed because cookies were rejected.
+
+ ## motd displayed sample entry
+ [Wed Dec 13 14:17:57 2000] [error] Motd::Display for URI: /requested/doc.html from $remote_ip
+
+ ## motd is bypassed sample entry
+ [Wed Dec 13 14:17:57 2000] [error] Motd::Bypassed by $remote_ip
+
+
+These entries can by used to gather statistics about how many times the
+motd is being encountered and how many times it's being bypassed.
+
 
 =head1 BUGS
 
@@ -274,6 +316,17 @@ unpredictable behavior.
 =head1 REQUIREMENTS
 
  L<mod_perl>, L<Apache::Cookie>
+
+
+=head1 CREDITS
+
+Fixes, Bug Reports, Optimizations and Ideas have been generously provided by:
+
+Jerrad Pierce <jpierce@cpan.org>
+ - no-cache pragma on motd file
+ - motd bypass on sub-directories and location matches
+ - no-cookie browser problem bug report
+
 
 =head1 AUTHOR
 
