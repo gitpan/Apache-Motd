@@ -18,3 +18,8 @@ Revision history for Perl extension Apache::Motd.
 	- Added Credits section in pod
 	- Added Notes secion in pod
 
+0.04  Thu Jul 19 01:15:55 2001
+	- Fixed port bug
+        - Fixed motd file existance check
+        - Updated documentation credits
+

@@ -6,7 +6,7 @@ use Apache;
 use Apache::Cookie;
 use Apache::Constants qw(:common REDIRECT);
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 sub handler {
     my $r    = shift;
@@ -15,6 +15,7 @@ sub handler {
     my $exp  = $r->dir_config('ExpireCookie')   || '+1d';
     my $file = $r->dir_config('MessageFile')    || 0;
     my $cookieless = $r->dir_config('SupportCookieLess') || 1;
+    my $port = ($r->server->port eq '80') ? "" : ':'.$r->server->port;
     my $tquery = $r->args; 
 
     ## If the request is the part of the cookie test redirect, then
@@ -27,9 +28,11 @@ sub handler {
        $r->args($tquery) if ($tquery =~ /=/);
     }
 
+    return OK unless $r->is_initial_req;
+
     ## MessageFile appears to be missing, pass onto next phase
     return OK unless $file;
-    return OK unless $r->is_initial_req;
+    return OK unless -e $file;
  
     ## Look for cookie ($cn) and verify it's value
     my $cookies = Apache::Cookie->new($r)->parse;
@@ -53,7 +56,7 @@ sub handler {
        return OK if $ct_request;
 
        my $host   = $r->hostname;
-       my $ct_url = 'http://'.$host.$uri.'?ct=1';
+       my $ct_url = 'http://'.$host.$port.$uri.'?ct=1';
        ## Test for client for cookie worthiness by redirecting client
        ## to same $uri but along with the cookie testflag (ct=1) in the
        ## query_string
@@ -327,6 +330,12 @@ Jerrad Pierce <jpierce@cpan.org>
  - motd bypass on sub-directories and location matches
  - no-cookie browser problem bug report
 
+Marion Gazdak
+ - Missing server port bug. Fixes problem when testing on the
+   non-standard port (80)
+ - Check for existance of motd file specified in MessageFile. Removing
+   motd file from location specified in MessageFile disables motd. Now
+   works as advertised.
 
 =head1 AUTHOR
 
